@@ -23,14 +23,14 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class FieldVO extends BaseVO implements Serializable {
 
-    @ApiModelProperty(value = "表所处的schema，不指定则查所有schema，可能会有重复的表",name = "tableSchema",example = "public")
+    @ApiModelProperty(value = "表所处的schema，不指定则查所有schema，可能会有重复的表",name = "tableSchema",example = "test")
     private String tableSchema;
 
     @NotBlank(message = "表名称（tableName）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
-    @ApiModelProperty(value = "表名称，用于指定查询哪个表的字段",name = "tableName", required = true,example = "test")
+    @ApiModelProperty(value = "表名称，用于指定查询哪个表的字段",name = "tableName", required = true,example = "tab_test")
     private String tableName;
 
     @ApiModelProperty(value = "字段类型名称，用于指定代表数据源字段类型的列名，系统自动填充",name = "targetFieldType",
-            hidden = true, example = "udt_name")
+            hidden = true, example = "schema_name")
     private String targetFieldType;
 }

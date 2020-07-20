@@ -21,7 +21,7 @@ import javax.validation.constraints.NotBlank;
 public class DataSourceDTO {
 
     @NotBlank(message = "数据源类型（type）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
-    @ApiModelProperty(value = "数据源类型（必填）",name = "type",example = "PostgreSQL", required = true)
+    @ApiModelProperty(value = "数据源类型（必填）",name = "type",example = "MySQL", required = true)
     private String type;
 
     @NotBlank(message = "连接ip地址（ip）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
@@ -29,7 +29,7 @@ public class DataSourceDTO {
     private String ip;
 
     @NotBlank(message = "连接端口号（port）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
-    @ApiModelProperty(value = "连接端口号（必填）",name = "port",example = "5432", required = true)
+    @ApiModelProperty(value = "连接端口号（必填）",name = "port",example = "3306", required = true)
     private String port;
 
     @NotBlank(message = "连接用户名（username）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
@@ -41,7 +41,7 @@ public class DataSourceDTO {
     private String password;
 
     @NotBlank(message = "默认连接的数据库（database）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
-    @ApiModelProperty(value = "默认连接的数据库（必填）",name = "database",example = "postgres", required = true)
+    @ApiModelProperty(value = "默认连接的数据库（必填）",name = "database",example = "test", required = true)
     private String database;
 
     @ApiModelProperty(value = "该数据源存储的key（非必填），若指定需确保唯一，不指定则由系统自动生成",

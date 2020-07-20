@@ -29,10 +29,10 @@ public class TableDataVO extends BaseVO implements Serializable {
     private List<String> targetFields;
 
     @NotBlank(message = "表名称（tableName）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
-    @ApiModelProperty(value = "表名称，用于指定查询哪个表的数据",name = "tableName", required = true,example = "test")
+    @ApiModelProperty(value = "表名称，用于指定查询哪个表的数据",name = "tableName", required = true,example = "tab_test")
     private String tableName;
 
-    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "public")
+    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "test")
     private String tableSchema;
 
     @ApiModelProperty(value = "排序map，key：字段名，value：排序规则，ASC：升序，DESC：降序",name = "orderMap",example = "{'id':'DESC','name':'ASC','age':'ASC'}")

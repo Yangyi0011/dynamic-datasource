@@ -22,7 +22,7 @@ import java.util.Map;
 @Accessors(chain = true)
 public class UpdateDTO {
 
-    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "public")
+    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "test")
     private String tableSchema;
 
     @NotBlank(message = "操作表（targetTable）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
