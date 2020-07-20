@@ -1,0 +1,34 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: DynamicDataSource
+  main:
+    # 设置定义 bean 可以被覆盖（多数源需要）
+    allow-bean-definition-overriding: true
+
+  # 数据源配置，数据从 common 文件提取
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${public.spring.datasource.host}:${public.spring.datasource.port}/test?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2b8
+    username: ${public.spring.datasource.username}
+    password: ${public.spring.datasource.password}
+
+# Swagger 开关，true：开/false：关
+swagger:
+  enable: false
+
+# 多数据源配置，需要一个默认数据源
+db:
+  # 默认连接的数据源
+  default:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 连接前缀
+    url-base: jdbc:mysql://
+    host: ${public.spring.datasource.host}
+    port: ${public.spring.datasource.port}
+    dbname: test
+    # 连接后缀
+    url-other: ?useUnicode=true&characterEncoding=utf-8&serverTimezone=GMT%2b8
+    username: ${public.spring.datasource.username}
+    password: ${public.spring.datasource.password}

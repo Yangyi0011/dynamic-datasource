@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.yangyi.dds.dao.DataSourceMapper">
+
+    <!--
+        List<String> getDatabases(@Param("vo") DataBaseVO vo);
+    -->
+    <select id="getDatabases" resultType="java.lang.String" parameterType="com.yangyi.dds.dao.DataSourceMapper">
+        SELECT
+            ${vo.targetField} AS baseName
+        FROM
+            ${vo.targetSource}
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.baseName != null and  vo.baseName != ''">
+                and ${vo.targetField} like concat('%',#{vo.baseName},'%')
+            </if>
+            <if test="vo.type != null and  vo.type == 'PostgreSQL' ">
+                and datistemplate = FALSE
+            </if>
+            <if test="vo.type != null and  vo.type == 'MySQL' ">
+                and schema_name not in ('information_schema','performance_schema','mysql')
+            </if>
+        </trim>
+        ORDER BY baseName ASC
+    </select>
+
+    <!--
+        List<Map<String,Object>> getTables(@Param("vo") TableVO vo);
+    -->
+    <select id="getTables" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.TableVO">
+        SELECT
+          table_name, table_schema
+        <if test="vo.type != null and vo.type == 'mysql' ">
+          , table_comment
+        </if>
+        <if test="vo.type != null and vo.type == 'postgresql' ">
+            , (
+            SELECT
+            CAST ( obj_description ( relfilenode, 'pg_class' ) AS VARCHAR ) AS COMMENT
+            FROM
+            pg_class
+            WHERE
+            relname = table_name
+            ) as table_comment
+        </if>
+        FROM
+          information_schema.tables
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.tableSchema != null and vo.tableSchema != ''">
+                and table_schema = #{vo.tableSchema}
+            </if>
+            <if test="vo.tableName != null and vo.tableName != ''">
+                and table_name like concat('%',#{vo.tableName},'%')
+            </if>
+            and table_type = 'BASE TABLE'
+        </trim>
+        ORDER BY table_name ASC, table_schema ASC
+    </select>
+
+    <!--
+        List<String> getTableByTableName(@Param("vo") TableVO vo);
+    -->
+    <select id="getTableByTableName" resultType="java.lang.String" parameterType="com.yangyi.dds.domain.vo.TableVO">
+        SELECT
+          table_name, table_schema
+        FROM
+        information_schema.tables
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.tableSchema != null and vo.tableSchema != ''">
+                and table_schema = #{vo.tableSchema}
+            </if>
+            <if test="vo.tableName != null and vo.tableName != ''">
+                and table_name = #{vo.tableName}
+            </if>
+            and table_type = 'BASE TABLE'
+        </trim>
+    </select>
+
+    <!--
+        List<Map<String,Object>> getTableData(@Param("vo") TableDataVO vo);
+    -->
+    <select id="getTableData" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.TableDataVO">
+        SELECT
+            <if test="vo.targetFields == null or vo.targetFields.size() == 0">
+                *
+            </if>
+            <if test="vo.targetFields != null and vo.targetFields.size() > 0">
+                <foreach collection="vo.targetFields" item="field" index="index" separator=",">
+                    ${field}
+                </foreach>
+            </if>
+        FROM
+          <if test="vo.tableSchema != null and vo.tableSchema != '' ">
+              ${vo.tableSchema}.
+          </if>
+          ${vo.tableName}
+        <if test="vo.orderMap != null and vo.orderMap.size() > 0">
+            order by
+            <foreach collection="vo.orderMap" item="mapValue" index="mapKey" separator=",">
+                  ${mapKey} ${mapValue}
+            </foreach>
+        </if>
+    </select>
+
+    <!--
+        int createTable(@Param("dto") TableDTO dto);
+    -->
+    <update id="createTable" parameterType="com.yangyi.dds.domain.dto.TableDTO">
+        CREATE TABLE
+        <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+            ${dto.tableSchema}.
+        </if>
+        ${dto.tableName}
+        <foreach collection="dto.dataMap" item="mapValue" index="mapKey" open="(" close=")" separator=",">
+            ${mapKey} ${mapValue}
+        </foreach>
+        <if test="dto.comment != null and dto.comment != '' ">
+            <if test="dto.type != null and dto.type == 'mysql' ">
+                COMMENT = #{dto.comment}
+            </if>
+            <if test="dto.type != null and dto.type == 'postgresql' ">
+                ; COMMENT ON TABLE
+                <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+                    ${dto.tableSchema}.
+                </if>
+                ${dto.tableName} IS '${dto.comment}'
+            </if>
+        </if>
+    </update>
+
+    <!--
+        int insert(@Param("dto") InsertDTO dto);
+    -->
+    <insert id="insert" parameterType="com.yangyi.dds.domain.dto.InsertDTO">
+        INSERT INTO
+        <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+            ${dto.tableSchema}.
+        </if>
+        ${dto.targetTable}
+        <foreach collection="dto.dataMap.entrySet()" item="mapValue" index="mapKey" open="(" close=")" separator=",">
+            ${mapKey}
+        </foreach>
+        VALUES
+        <foreach collection="dto.dataMap.entrySet()" item="mapValue" index="mapKey" open="(" close=")" separator=",">
+            #{mapValue}
+        </foreach>
+    </insert>
+
+    <!--
+        int update(@Param("dto") UpdateDTO dto);
+    -->
+    <update id="update" parameterType="com.yangyi.dds.domain.dto.UpdateDTO">
+        UPDATE
+        <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+            ${dto.tableSchema}.
+        </if>
+        ${dto.targetTable}
+        <set>
+            <foreach collection="dto.dataMap.entrySet()" item="mapValue" index="mapKey" separator=",">
+              ${mapKey} = #{mapValue}
+            </foreach>
+        </set>
+        <if test="dto.conditionMap != null and dto.conditionMap.size() > 0">
+            <trim prefix="where" prefixOverrides="and">
+                <foreach collection="dto.conditionMap.entrySet()" item="mapValue" index="mapKey">
+                    and ${mapKey} = #{mapValue}
+                </foreach>
+            </trim>
+        </if>
+    </update>
+
+    <!--
+        int delete(@Param("dto") DeleteDTO dto);
+    -->
+    <delete id="delete" parameterType="com.yangyi.dds.domain.dto.DeleteDTO">
+        DELETE FROM
+        <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+            ${dto.tableSchema}.
+        </if>
+        ${dto.targetTable}
+        <trim prefix="where" prefixOverrides="and">
+            <foreach collection="dto.conditionMap.entrySet()" item="mapValue" index="mapKey">
+                and ${mapKey} = #{mapValue}
+            </foreach>
+        </trim>
+    </delete>
+
+    <!--
+        List<Map<String,Object>> getTableFields(@Param("vo") FieldVO vo);
+    -->
+    <select id="getTableFields" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.FieldVO">
+        SELECT
+            column_name AS field_name,
+            <if test="vo.targetFieldType != null and vo.targetFieldType != '' ">
+                ${vo.targetFieldType} as field_type,
+            </if>
+            table_name,
+            table_schema
+        FROM
+            information_schema.COLUMNS
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.tableName != null and vo.tableName != '' ">
+                and table_name = #{vo.tableName}
+            </if>
+            <if test="vo.tableSchema != null and vo.tableSchema != '' ">
+                and table_schema = #{vo.tableSchema}
+            </if>
+        </trim>
+    </select>
+
+    <!--
+        Map<String,Object> getPrimaryKeyForMySQL(@Param("vo") PrimaryKeyVO vo);
+    -->
+    <select id="getPrimaryKeyForMySQL" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.PrimaryKeyVO">
+        SELECT
+            table_schema,
+            table_name,
+            column_name
+        FROM
+            INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.tableSchema != null and vo.tableSchema != '' ">
+                and table_schema = #{vo.tableSchema}
+            </if>
+            <if test="vo.tableName != null and vo.tableName != '' ">
+                and table_name = #{vo.tableName}
+            </if>
+        </trim>
+    </select>
+
+    <!--
+        Map<String,Object> getPrimaryKeyForPostgreSQL(@Param("vo") PrimaryKeyVO vo);
+    -->
+    <select id="getPrimaryKeyForPostgreSQL" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.PrimaryKeyVO">
+        WITH tmp_tab AS (
+        SELECT
+        n.nspname AS schemaname,
+        C.oid AS reloid,
+        C.relname,
+        CASE
+        C.relkind
+        WHEN 'r' THEN
+        'table'
+        WHEN 'm' THEN
+        'materialized view'
+        WHEN 's' THEN
+        'special'
+        WHEN 'f' THEN
+        'foreign table'
+        WHEN 'p' THEN
+        'table'
+        END AS relType,
+        pg_catalog.pg_get_userbyid ( C.relowner ) AS ownername
+        FROM
+        pg_catalog.pg_class
+        C LEFT JOIN pg_catalog.pg_namespace n ON n.oid = C.relnamespace
+        WHERE
+        1 = 1 --r = 普通表， i = 索引， S = 序列， t = TOAST表， v = 视图， m = 物化视图， c = 组合类型， f = 外部表， p = 分区表， I = 分区索引
+
+        AND C.relkind IN ( 'r', 'p', 'm', 'f', '' )
+        AND n.nspname &lt;&gt; 'pg_catalog'
+        AND n.nspname &lt;&gt; 'information_schema'
+        AND n.nspname !~ '^pg_toast'
+        AND pg_catalog.pg_table_is_visible ( C.oid )
+        ORDER BY
+        1,
+        2
+        ) SELECT
+        current_database ( ) AS database_name,
+        tab.schemaname AS schema_name,
+        tab.reloid as asrelo_id,
+        tab.relname as table_name,
+        tab.reltype as rel_type,
+        tab.ownername owner_name,
+        pco.conname AS pk_name,
+        pa.attname AS column_name,
+        pt.typname AS column_type
+        FROM
+        tmp_tab tab
+        LEFT OUTER JOIN pg_constraint pco ON pco.conrelid = tab.reloid
+        AND pco.contype = 'p'
+        LEFT OUTER JOIN pg_attribute pa ON pa.attrelid = tab.reloid
+        AND pa.attnum = pco.conkey [ 1 ]
+        LEFT OUTER JOIN pg_type pt ON pt.oid = pa.atttypid
+        <trim prefix="where" prefixOverrides="and">
+            <if test="vo.tableSchema != null and vo.tableSchema != '' ">
+                and tab.schemaname = #{vo.tableSchema}
+            </if>
+            <if test="vo.tableName != null and vo.tableName != '' ">
+                and tab.relname = #{vo.tableName}
+            </if>
+        </trim>
+    </select>
+
+</mapper>

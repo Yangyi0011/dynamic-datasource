@@ -1,0 +1,53 @@
+# 本文件是项目启动的入口文件，可以指定项目的运行环境和配置一些共用的项目配置信息
+
+spring:
+  profiles:
+    # 指定项目运行环境配置文件
+    active: dev,common
+
+# PageHelper 分页插件配置
+pagehelper:
+  # 分页插件会自动检测当前的数据库链接，自动选择合适的分页方式（此处不设置，采用动态识别）
+  # helper-dialect: mysql
+
+  # 自动识别当前数据源类型
+  auto-dialect: true
+  # 分页合法性纠错
+  reasonable: true
+  # 默认值为 false。设置为 true 时，允许在运行时根据多数据源自动识别对应方言的分页
+  auto-runtime-dialect: true
+  # 默认值为 true。当使用运行时动态数据源或没有设置 helperDialect 属性自动获取数据库类型时，
+  # 会自动获取一个数据库连接， 通过该属性来设置是否关闭获取的这个连接，默认true关闭，设置为 false 后，
+  # 不会关闭获取的连接，这个参数的设置要根据自己选择的数据源来决定。
+  close-conn: true
+
+# mybatis
+mybatis:
+  # 指定 xml 文件路径
+  mapper-locations:
+      - classpath*:/mapper/**/*.xml
+  configuration:
+    # 处理 mybatis value为空 key不存在的问题。默认为 false
+    call-setters-on-nulls: true
+    # 是否开启驼峰命名转换。默认为 true
+    map-underscore-to-camel-case: true
+    # 是否开启全局的映射器缓存。默认为 true
+    cache-enabled: true
+    # 是否开启全局懒加载。默认为 true
+    lazy-loading-enabled: true
+    # 配合懒加载使用。遇到有关联属性的对象时是否启用懒加载。默认为 true
+    aggressive-lazy-loading: true
+    # 是否允许多种结果集从一个单独的语句中返回(需要适合的驱动)。默认为 true
+    multiple-result-sets-enabled: true
+    # 是否使用列标签代替列名，不同的驱动在这方便表现不同。默认为 true
+    use-column-label: true
+    # 是否允许 jdbc 识别数据库自增主键，需要适合的驱动。默认为 false
+    use-generated-keys: true
+    # 指定 MyBatis 如何自动映射列到字段/属性。PARTIAL只会自动映射简单, 没有嵌套的结果。FULL会自动映射任意复杂的结果(嵌套的或其他情况)。默认为 full
+    auto-mapping-behavior: full
+    # 默认的 SQL 执行器，SIMPLE（简单）, REUSE（可重用）, BATCH（批处理）。默认为 batch
+    default-executor-type: batch
+    # 驱动等待一个数据库响应的超时时间（毫秒）
+    default-statement-timeout: 25000
+    # 日志记录器的名称前缀
+    log-prefix: dao.
