@@ -143,7 +143,7 @@ public class DataSourceConfigurer {
      * @return the platform transaction manager
      */
     @Bean
-    public PlatformTransactionManager transactionManager() {
+    public DataSourceTransactionManager transactionManager() {
         return new DataSourceTransactionManager(dynamicDataSource());
     }
 }

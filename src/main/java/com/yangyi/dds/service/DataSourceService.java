@@ -206,4 +206,33 @@ public interface DataSourceService {
      * @return 操作成功返回 true，否则返回 false
      */
     boolean batchDelete(DataSourceDTO dataSourceDTO, BatchDeleteDTO batchDeleteDTO);
+
+    /**
+     * 动态数据全表删除（默认数据源）
+     *
+     * @param dto 数据删除dto
+     * @return 操作成功返回 true，否则返回 false
+     */
+    boolean deleteAll(DeleteDTO dto);
+
+    /**
+     * 动态数据全表删除（指定数据源）
+     *
+     * @param dataSourceDTO 数据源dto
+     * @param deleteDTO     数据删除dto
+     * @return 操作成功返回 true，否则返回 false
+     */
+    boolean deleteAll(DataSourceDTO dataSourceDTO, DeleteDTO deleteDTO);
+
+    /**
+     * 修改表（默认数据源）
+     * @param sql 修改语句
+     */
+    boolean alterTable(String sql);
+
+    /**
+     * 修改表（指定数据源）
+     * @param sql 修改语句
+     */
+    boolean alterTable(DataSourceDTO dataSourceDTO, String sql);
 }

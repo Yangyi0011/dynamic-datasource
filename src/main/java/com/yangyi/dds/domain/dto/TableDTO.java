@@ -22,7 +22,7 @@ import java.util.Map;
 @Accessors(chain = true)
 public class TableDTO {
 
-    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "test")
+    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "public")
     private String tableSchema;
 
     @NotBlank(message = "表名（tableName）不能为空", groups = {ValidationGroup_Add.class, ValidationGroup_Update.class})
@@ -37,6 +37,6 @@ public class TableDTO {
     @ApiModelProperty(value = "表备注",name = "comment",example = "备注")
     private String comment;
 
-    @ApiModelProperty(value = "数据源类型，系统自动判断",name = "type", hidden = true,example = "mysql")
+    @ApiModelProperty(value = "数据源类型，系统自动判断",name = "type", hidden = true,example = "postgresql")
     private String type;
 }

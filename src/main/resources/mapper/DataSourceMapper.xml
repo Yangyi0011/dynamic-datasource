@@ -186,6 +186,17 @@
     </delete>
 
     <!--
+    int deleteAll(@Param("dto") DeleteDTO dto);
+-->
+    <delete id="deleteAll" parameterType="com.yangyi.dds.domain.dto.DeleteDTO">
+        DELETE FROM
+        <if test="dto.tableSchema != null and dto.tableSchema != '' ">
+            ${dto.tableSchema}.
+        </if>
+        ${dto.targetTable}
+    </delete>
+
+    <!--
         List<Map<String,Object>> getTableFields(@Param("vo") FieldVO vo);
     -->
     <select id="getTableFields" resultType="java.util.Map" parameterType="com.yangyi.dds.domain.vo.FieldVO">
@@ -291,5 +302,12 @@
             </if>
         </trim>
     </select>
+
+    <!--
+        int alterTable(String sql);
+    -->
+    <update id="alterTable" parameterType="java.lang.String" >
+        ${sql}
+    </update>
 
 </mapper>

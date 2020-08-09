@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
@@ -50,10 +51,10 @@ public class DataSourceServiceImpl implements DataSourceService {
     public boolean testConnection(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto) {
 
         // 拼接 url
-        String url = getUrl(dto);
+        String url = DataSourceUtil.getUrlByDataSourceDTO(dto);
 
         // 获取对应的驱动类
-        String driverClass = getDriverClass(dto.getType());
+        String driverClass = DataSourceUtil.getDriverClassByType(dto.getType());
 
         return DataSourceUtil.testConnection(driverClass, url, dto.getUsername(), dto.getPassword());
     }
@@ -163,7 +164,7 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
 
         // 拼接URL
-        String url = getUrl(dto);
+        String url = DataSourceUtil.getUrlByDataSourceDTO(dto);
 
         // 设置数据源默认的key
         /*if (StringUtils.isEmpty(dto.getDataSourceKey())) {
@@ -192,7 +193,7 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
 
         // 数据源不存在则先创建再切换
-        DruidDataSource dataSource = createDataSource(dto);
+        DruidDataSource dataSource = DataSourceUtil.createDataSource(dto);
         if (dataSource == null) {
             throw new DataSourceCreateException("数据源创建异常");
         }
@@ -205,65 +206,6 @@ public class DataSourceServiceImpl implements DataSourceService {
         }
 
         return true;
-    }
-
-    /**
-     * 创建数据源对象
-     *
-     * @param dto 数据源dto
-     * @return data source
-     */
-    private DruidDataSource createDataSource(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto) {
-
-        if (dto == null) {
-            return null;
-        }
-
-        // 目前只支持 mysql 和 postgreSql
-        if (!DataSourceUtil.dataSourceMap.containsKey(dto.getType())) {
-            throw new FindException("错误，未知的数据源类型：" + dto.getType() + "，目前只支持 MySQL 和 PostgreSQL");
-        }
-
-        // 拼接URL
-        String url = getUrl(dto);
-
-        // 设置数据源的key，默认采用：jdbc的连接url（不带后缀） 作为key，如：jdbc:mysql://127.0.0.1:3306/test
-        /*if (StringUtils.isEmpty(dto.getDataSourceKey())) {
-            int i = url.indexOf("?");
-            String key = url.substring(0,i == -1 ? url.length() : i);
-            dto.setDataSourceKey(key);
-        }*/
-
-        // 不再支持手动指定 dataSourceKey
-        int i = url.indexOf("?");
-        String key = url.substring(0, i == -1 ? url.length() : i);
-        dto.setDataSourceKey(key);
-
-        // 判断储存动态数据源实例的map中key值是否存在
-        if (DynamicDataSource.isExistDataSource(dto.getDataSourceKey())) {
-            throw new DataSourceCreateException("数据源已存在，请指定key后重试");
-        }
-
-        DruidDataSource dataSource = new DruidDataSource();
-
-        // 获取对应的驱动类
-        String driverClass = getDriverClass(dto.getType());
-
-        if (log.isDebugEnabled()) {
-            log.info("创建的数据源连接url = " + url);
-        }
-
-        dataSource.setUrl(url);
-        dataSource.setUsername(dto.getUsername());
-        dataSource.setPassword(dto.getPassword());
-        dataSource.setDriverClassName(driverClass);
-
-        //将创建的数据源，新增到targetDataSources中
-        Map<Object, Object> map = new HashMap<>();
-        map.put(dto.getDataSourceKey(), dataSource);
-        DynamicDataSource.getInstance().setTargetDataSources(map);
-
-        return dataSource;
     }
 
     /**
@@ -326,22 +268,11 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 连接失败返回“连接失败”，连接成功返回该数据源的所有数据库数据
      */
     @Override
-    public synchronized PageInfo getDatabases(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
-                                              @Validated(value = {ValidationGroup_Add.class}) DataBaseVO vo) {
-
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dto);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
-
-            // 查询数据
-            return getDatabases(vo);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
+    public PageInfo getDatabases(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
+                                 @Validated(value = {ValidationGroup_Add.class}) DataBaseVO vo) {
+        // 数据源的切换/释放交给AOP去处理
+        // 查询数据
+        return getDatabases(vo);
     }
 
     /**
@@ -377,22 +308,12 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 连接失败返回“连接失败”，连接成功返回该数据源的所有数据库数据
      */
     @Override
-    public synchronized PageInfo getTables(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
-                                           @Validated(value = {ValidationGroup_Add.class}) TableVO vo) {
+    public PageInfo getTables(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
+                              @Validated(value = {ValidationGroup_Add.class}) TableVO vo) {
+        // 数据源的切换/释放交给AOP去处理
+        // 查询数据
+        return getTables(vo);
 
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dto);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
-
-            // 查询数据
-            return getTables(vo);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
     }
 
     /**
@@ -487,21 +408,12 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return PageInfo
      */
     @Override
-    public synchronized PageInfo getTableFields(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
-                                                @Validated(value = {ValidationGroup_Add.class}) FieldVO vo) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dto);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+    public PageInfo getTableFields(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
+                                   @Validated(value = {ValidationGroup_Add.class}) FieldVO vo) {
+        // 数据源的切换/释放交给AOP去处理
+        // 查询数据
+        return getTableFields(vo);
 
-            // 查询数据
-            return getTableFields(vo);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
     }
 
     /**
@@ -529,19 +441,10 @@ public class DataSourceServiceImpl implements DataSourceService {
     @Override
     public boolean isTableExist(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
                                 @Validated(value = {ValidationGroup_Add.class}) TableVO vo) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dto);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+        // 数据源的切换/释放交给AOP去处理
+        // 判断表是否存在
+        return isTableExist(vo);
 
-            // 判断表是否存在
-            return isTableExist(vo);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
     }
 
     /**
@@ -552,20 +455,12 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 操作成功返回 true，否则返回 false
      */
     @Override
-    public boolean createTable(DataSourceDTO dataSourceDTO, TableDTO tableDTO) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dataSourceDTO);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+    public boolean createTable(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
+                               @Validated(value = {ValidationGroup_Add.class}) TableDTO tableDTO) {
+        // 数据源的切换/释放交给AOP去处理
+        // 动态表创建
+        return createTable(tableDTO);
 
-            // 动态表创建
-            return createTable(tableDTO);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
     }
 
     /**
@@ -598,16 +493,20 @@ public class DataSourceServiceImpl implements DataSourceService {
             // throw new TableCreateException("创建失败，表 " + dto.getTableSchema() + "." +dto.getTableName() + " 已存在");
         }
 
-        // 设置主键
-        /*Map<String, Object> dataMap = dto.getDataMap();
-        dataMap.put("id", "int NOT NULL AUTO_INCREMENT, PRIMARY KEY (id)");
-        // 替换表数据
-        dto.setDataMap(dataMap);*/
-
         // 设置备注
         // 获取当前数据源类型
         String type = DataSourceUtil.getCurrentDataSourceType();
         dto.setType(type);
+
+        // 设置主键
+        String primaryKey = dto.getTableName() + "_id";
+        Map<String, Object> dataMap = dto.getDataMap();
+        if (DataSourceUtil.MYSQL_NAME.equalsIgnoreCase(type)) {
+            dataMap.put(primaryKey, "int(10) unsigned NOT NULL AUTO_INCREMENT");
+        } else {
+            dataMap.put(primaryKey, "serial");
+        }
+        dataMap.put("PRIMARY KEY", "(" + primaryKey + ")");
 
         // 创建表
         dataSourceMapper.createTable(dto);
@@ -653,107 +552,99 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 连接失败返回“连接失败”，连接成功返回 Map<String, Object>
      */
     @Override
-    public synchronized Map<String, Object> select(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
-                                                   @Validated(value = {ValidationGroup_Add.class}) TableDataVO vo) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dto);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+    public Map<String, Object> select(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dto,
+                                      @Validated(value = {ValidationGroup_Add.class}) TableDataVO vo) {
+        // 数据源的切换/释放交给AOP去处理
 
-            // 结果 map，存放 表数据分页信息 和 表字段信息
-            HashMap<String, Object> resultMap = new HashMap<>();
+        // 结果 map，存放 表数据分页信息 和 表字段信息
+        HashMap<String, Object> resultMap = new HashMap<>();
 
-            // 构建表字段查询vo
-            FieldVO fieldVO = new FieldVO();
-            fieldVO.setTableSchema(vo.getTableSchema())
-                    .setTableName(vo.getTableName());
+        // 构建表字段查询vo
+        FieldVO fieldVO = new FieldVO();
+        fieldVO.setTableSchema(vo.getTableSchema())
+                .setTableName(vo.getTableName());
 
-            // 获取当前数据源类型
-            String type = DataSourceUtil.getCurrentDataSourceType();
-            if (DataSourceUtil.MYSQL_NAME.equalsIgnoreCase(type)) {
+        // 获取当前数据源类型
+        String type = DataSourceUtil.getCurrentDataSourceType();
+        if (DataSourceUtil.MYSQL_NAME.equalsIgnoreCase(type)) {
 
-                // mysql 数据源
-                fieldVO.setTargetFieldType(DataSourceUtil.MYSQL_TARGET_FIELD_TYPE);
+            // mysql 数据源
+            fieldVO.setTargetFieldType(DataSourceUtil.MYSQL_TARGET_FIELD_TYPE);
 
-            } else if (DataSourceUtil.POSTGRESQL_NAME.equalsIgnoreCase(type)) {
+        } else if (DataSourceUtil.POSTGRESQL_NAME.equalsIgnoreCase(type)) {
 
-                // PostGre 数据源
-                fieldVO.setTargetFieldType(DataSourceUtil.POSTGRESQL_TARGET_FIELD_TYPE);
+            // PostGre 数据源
+            fieldVO.setTargetFieldType(DataSourceUtil.POSTGRESQL_TARGET_FIELD_TYPE);
 
-            } else {
-                throw new FindException("操作失败，不支持的数据源类型：" + type);
-            }
-
-            // 查询表字段
-            List<Map<String, Object>> fieldList = getTableFields(fieldVO).getList();
-            resultMap.put("fieldList", fieldList);
-
-            // 主键
-            String primaryKey = null;
-
-            // 设置默认的查询字段（查全部字段）
-            if (vo.getTargetFields() == null || vo.getTargetFields().size() == 0) {
-
-                if (fieldList != null && fieldList.size() != 0) {
-
-                    // 构造数据查询字段 list
-                    List<String> targetFields = new ArrayList<>();
-                    for (Map<String, Object> map : fieldList) {
-
-                        // 获取字段名称
-                        String fieldName = map.get("field_name").toString();
-                        // 获取字段类型
-                        String fieldType = map.get("field_type").toString();
-
-                        // 当前字段是否是主键
-                        Boolean isPrimaryKey = Boolean.valueOf(map.get("isPrimaryKey").toString());
-                        if (isPrimaryKey) {
-                            primaryKey = fieldName;
-                        }
-
-                        // 处理 PostgreSQL 的特殊字段类型 geometry
-                        if ("geometry".equalsIgnoreCase(fieldType)) {
-
-                            // 使用 st_astext 函数对该字段进行数据解析
-                            fieldName = "st_astext(" + fieldName + ") as " + fieldName;
-                        }
-
-                        // 装入集合
-                        targetFields.add(fieldName);
-                    }
-
-                    // 设置查询
-                    vo.setTargetFields(targetFields);
-                }
-            }
-
-            // 设置默认的排序规则
-            if (vo.getOrderMap() == null || vo.getOrderMap().size() == 0) {
-                Map<String, String> orderMap = new HashMap<>();
-
-                // 没有主键则用第一个字段做排序，否则用主键做排序
-                if (StringUtils.isEmpty(primaryKey)) {
-                    if (vo.getTargetFields() != null && vo.getTargetFields().size() > 0) {
-                        orderMap.put(vo.getTargetFields().get(0), "ASC");
-                    }
-                } else {
-                    orderMap.put(primaryKey, "DESC");
-                }
-
-                vo.setOrderMap(orderMap);
-            }
-
-            // 查询表数据
-            PageInfo pageInfo = select(vo);
-            resultMap.put("pageInfo", pageInfo);
-
-            return resultMap;
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
+        } else {
+            throw new FindException("操作失败，不支持的数据源类型：" + type);
         }
+
+        // 查询表字段
+        List<Map<String, Object>> fieldList = getTableFields(fieldVO).getList();
+        resultMap.put("fieldList", fieldList);
+
+        // 主键
+        String primaryKey = null;
+
+        // 设置默认的查询字段（查全部字段）
+        if (vo.getTargetFields() == null || vo.getTargetFields().size() == 0) {
+
+            if (fieldList != null && fieldList.size() != 0) {
+
+                // 构造数据查询字段 list
+                List<String> targetFields = new ArrayList<>();
+                for (Map<String, Object> map : fieldList) {
+
+                    // 获取字段名称
+                    String fieldName = map.get("field_name").toString();
+                    // 获取字段类型
+                    String fieldType = map.get("field_type").toString();
+
+                    // 当前字段是否是主键
+                    Boolean isPrimaryKey = Boolean.valueOf(map.get("isPrimaryKey").toString());
+                    if (isPrimaryKey) {
+                        primaryKey = fieldName;
+                    }
+
+                    // 处理 PostgreSQL 的特殊字段类型 geometry
+                    if ("geometry".equalsIgnoreCase(fieldType)) {
+
+                        // 使用 st_astext 函数对该字段进行数据解析
+                        fieldName = "st_astext(" + fieldName + ") as " + fieldName;
+                    }
+
+                    // 装入集合
+                    targetFields.add(fieldName);
+                }
+
+                // 设置查询
+                vo.setTargetFields(targetFields);
+            }
+        }
+
+        // 设置默认的排序规则
+        if (vo.getOrderMap() == null || vo.getOrderMap().size() == 0) {
+            Map<String, String> orderMap = new HashMap<>();
+
+            // 没有主键则用第一个字段做排序，否则用主键做排序
+            if (StringUtils.isEmpty(primaryKey)) {
+                if (vo.getTargetFields() != null && vo.getTargetFields().size() > 0) {
+                    orderMap.put(vo.getTargetFields().get(0), "ASC");
+                }
+            } else {
+                orderMap.put(primaryKey, "DESC");
+            }
+
+            vo.setOrderMap(orderMap);
+        }
+
+        // 查询表数据
+        PageInfo pageInfo = select(vo);
+        resultMap.put("pageInfo", pageInfo);
+
+        return resultMap;
+
     }
 
     /**
@@ -769,6 +660,16 @@ public class DataSourceServiceImpl implements DataSourceService {
             return false;
         }
 
+        TableVO tableVO = new TableVO();
+        tableVO.setType(DataSourceUtil.getCurrentDataSourceType())
+                .setTableSchema(dto.getTableSchema())
+                .setTableName(dto.getTargetTable());
+        boolean tableExist = isTableExist(tableVO);
+
+        if (!tableExist) {
+            throw new InsertException("操作失败，数据表 " + dto.getTableSchema() + "." + dto.getTargetTable() + " 不存在或已被删除");
+        }
+
         return dataSourceMapper.insert(dto) > 0;
     }
 
@@ -780,21 +681,12 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 操作成功返回 true，否则返回 false
      */
     @Override
-    public synchronized boolean insert(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
-                                       @Validated(value = {ValidationGroup_Add.class}) InsertDTO insertDTO) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dataSourceDTO);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+    public boolean insert(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
+                          @Validated(value = {ValidationGroup_Add.class}) InsertDTO insertDTO) {
+        // 数据源的切换/释放交给AOP去处理
+        // 数据插入
+        return insert(insertDTO);
 
-            // 数据插入
-            return insert(insertDTO);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
     }
 
     /**
@@ -814,6 +706,16 @@ public class DataSourceServiceImpl implements DataSourceService {
             throw new UpdateException("请先选择要更新的数据");
         }
 
+        TableVO tableVO = new TableVO();
+        tableVO.setType(DataSourceUtil.getCurrentDataSourceType())
+                .setTableSchema(dto.getTableSchema())
+                .setTableName(dto.getTargetTable());
+        boolean tableExist = isTableExist(tableVO);
+
+        if (!tableExist) {
+            throw new UpdateException("操作失败，数据表 " + dto.getTableSchema() + "." + dto.getTargetTable() + " 不存在或已被删除");
+        }
+
         return dataSourceMapper.update(dto) > 0;
     }
 
@@ -825,21 +727,52 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 操作成功返回 true，否则返回 false
      */
     @Override
-    public synchronized boolean update(@Validated(value = {ValidationGroup_Update.class}) DataSourceDTO dataSourceDTO,
-                                       @Validated(value = {ValidationGroup_Update.class}) UpdateDTO updateDTO) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dataSourceDTO);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+    public boolean update(@Validated(value = {ValidationGroup_Update.class}) DataSourceDTO dataSourceDTO,
+                          @Validated(value = {ValidationGroup_Update.class}) UpdateDTO updateDTO) {
+        // 数据源的切换/释放交给AOP去处理
+        // 切换数据源由AOP去处理
+        return update(updateDTO);
+    }
 
-            // 数据更新
-            return update(updateDTO);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
+    /**
+     * 动态数据全表删除（默认数据源）
+     *
+     * @param dto 数据删除dto
+     * @return 操作成功返回 true，否则返回 false
+     */
+    @Override
+    public boolean deleteAll(@Validated(value = {ValidationGroup_Add.class}) DeleteDTO dto) {
+
+        // 避免全表删除
+        Assert.notNull(dto, "动态数据删除DTO不能为空");
+
+        TableVO tableVO = new TableVO();
+        tableVO.setType(DataSourceUtil.getCurrentDataSourceType())
+                .setTableSchema(dto.getTableSchema())
+                .setTableName(dto.getTargetTable());
+
+        // 判断表是否存在
+        boolean tableExist = isTableExist(tableVO);
+        if (!tableExist) {
+            throw new DeleteException("操作失败，数据表 " + dto.getTableSchema() + "." + dto.getTargetTable() + " 不存在或已被删除");
         }
+
+        return dataSourceMapper.deleteAll(dto) > 0;
+    }
+
+    /**
+     * 动态数据全表删除（指定数据源）
+     *
+     * @param dataSourceDTO 数据源dto
+     * @param deleteDTO     数据删除dto
+     * @return 操作成功返回 true，否则返回 false
+     */
+    @Override
+    public boolean deleteAll(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
+                             @Validated(value = {ValidationGroup_Add.class}) DeleteDTO deleteDTO) {
+        // 切换数据源由AOP去处理
+        // 数据删除
+        return deleteAll(deleteDTO);
     }
 
     /**
@@ -856,12 +789,16 @@ public class DataSourceServiceImpl implements DataSourceService {
         Assert.notNull(dto.getConditionMap(), "请先选择要删除的数据");
         Assert.isTrue(dto.getConditionMap().size() > 0, "请先选择要删除的数据");
 
-        // 判断数据是否存在
-        /*TableDataVO vo = new TableDataVO();
-        List<Map<String, Object>> tableData = dataSourceMapper.getTableData(vo);
-        if (tableData == null || tableData.size() == 0) {
-            throw new DeleteException("操作失败，数据不存在或已被删除");
-        }*/
+        TableVO tableVO = new TableVO();
+        tableVO.setType(DataSourceUtil.getCurrentDataSourceType())
+                .setTableSchema(dto.getTableSchema())
+                .setTableName(dto.getTargetTable());
+
+        // 判断表是否存在
+        boolean tableExist = isTableExist(tableVO);
+        if (!tableExist) {
+            throw new DeleteException("操作失败，数据表 " + dto.getTableSchema() + "." + dto.getTargetTable() + " 不存在或已被删除");
+        }
 
         return dataSourceMapper.delete(dto) > 0;
     }
@@ -872,9 +809,9 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @param dto 批量数据删除dto
      * @return 操作成功返回 true，否则返回 false
      */
-    //@Transactional(rollbackFor = Exception.class, transactionManager = "transactionManager")
+    @Transactional(rollbackFor = Exception.class)
     @Override
-    public synchronized boolean batchDelete(@Validated(value = {ValidationGroup_Add.class}) BatchDeleteDTO dto) {
+    public boolean batchDelete(@Validated(value = {ValidationGroup_Add.class}) BatchDeleteDTO dto) {
 
         Assert.notNull(dto, "动态数据批量删除DTO不能为空");
         Assert.notNull(dto.getConditionMaps(), "请先选择要删除的数据");
@@ -889,7 +826,10 @@ public class DataSourceServiceImpl implements DataSourceService {
             deleteDTO.setTargetTable(targetTable)
                     .setConditionMap(map);
 
-            delete(deleteDTO);
+            boolean delete = delete(deleteDTO);
+            if (!delete) {
+                throw new DeleteException("操作失败，数据不存在或已被删除");
+            }
         });
 
         return true;
@@ -903,21 +843,11 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @return 操作成功返回 true，否则返回 false
      */
     @Override
-    public synchronized boolean delete(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
-                                       @Validated(value = {ValidationGroup_Add.class}) DeleteDTO deleteDTO) {
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dataSourceDTO);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
-
-            // 数据删除
-            return delete(deleteDTO);
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
-        }
+    public boolean delete(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
+                          @Validated(value = {ValidationGroup_Add.class}) DeleteDTO deleteDTO) {
+        // 切换数据源由AOP去处理
+        // 数据删除
+        return delete(deleteDTO);
     }
 
     /**
@@ -927,88 +857,64 @@ public class DataSourceServiceImpl implements DataSourceService {
      * @param batchDeleteDTO 批量数据删除dto
      * @return 操作成功返回 true，否则返回 false
      */
-//    @Transactional(rollbackFor = Exception.class, transactionManager = "transactionManager")
     @Override
-    public synchronized boolean batchDelete(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
-                                            @Validated(value = {ValidationGroup_Add.class}) BatchDeleteDTO batchDeleteDTO) {
+    public boolean batchDelete(@Validated(value = {ValidationGroup_Add.class}) DataSourceDTO dataSourceDTO,
+                               @Validated(value = {ValidationGroup_Add.class}) BatchDeleteDTO batchDeleteDTO) {
+        // 数据源的切换/释放交给AOP去处理
+        return batchDelete(batchDeleteDTO);
+    }
 
-        Assert.notNull(dataSourceDTO, "数据源不能为空");
-        Assert.notNull(batchDeleteDTO, "动态数据批量删除DTO不能为空");
-        Assert.notNull(batchDeleteDTO.getConditionMaps(), "请先选择要删除的数据");
-        Assert.isTrue(batchDeleteDTO.getConditionMaps().size() > 0, "请先选择要删除的数据");
+    /**
+     * 修改表（默认数据源）
+     *
+     * @param sql 修改语句
+     */
+    @Override
+    public boolean alterTable(String sql) {
+        Assert.isTrue(!StringUtils.isEmpty(sql), "修改SQL语句不能为空");
 
-        try {
-            // 切换数据源
-            boolean change = changeDataSource(dataSourceDTO);
-            if (!change) {
-                throw new DataSourceConnectionException("数据源切换失败");
-            }
+        // 非法字符校验
+        String testSql = sql.toLowerCase();
 
-            String targetTable = batchDeleteDTO.getTargetTable();
-            List<Map<String, Object>> conditionMaps = batchDeleteDTO.getConditionMaps();
-
-            // 循环删除
-            conditionMaps.forEach((map) -> {
-                DeleteDTO deleteDTO = new DeleteDTO();
-                deleteDTO.setTargetTable(targetTable)
-                        .setConditionMap(map);
-                delete(deleteDTO);
-            });
-
-        } finally {
-            // 数据源还原
-            DynamicDataSourceContextHolder.clearDataSourceKey();
+        /*final String delete = "delete";
+        if (testSql.contains(delete)) {
+            throw new UpdateException("操作失败，非法字符：" + delete);
         }
+        final String drop = "drop";
+        if (testSql.contains(drop)) {
+            throw new UpdateException("操作失败，非法字符：" + drop);
+        }
+        final String update = "update";
+        if (testSql.contains(update)) {
+            throw new UpdateException("操作失败，非法字符：" + update);
+        }*/
+        final String other1 = "--";
+        if (testSql.contains(other1)) {
+            throw new UpdateException("操作失败，非法字符：" + other1);
+        }
+        /*final String other2  = "=";
+        if (testSql.contains(other2)) {
+            throw new UpdateException("操作失败，非法字符：" + other2);
+        }
+        final String other3  = "!=";
+        if (testSql.contains(other3)) {
+            throw new UpdateException("操作失败，非法字符：" + other3);
+        }*/
+
+        // 执行SQL
+        int successCnt = dataSourceMapper.alterTable(sql);
+
         return true;
     }
 
     /**
-     * 获取数据源连接驱动类
+     * 修改表（指定数据源）
      *
-     * @param type 数据源类型
-     * @return 返回驱动类的全类名
+     * @param sql 修改语句
      */
-    private String getDriverClass(String type) {
-
-        if (!DataSourceUtil.dataSourceMap.containsKey(type)) {
-            throw new FindException("错误，未知的数据源类型：" + type);
-        }
-
-        if (DataSourceUtil.POSTGRESQL_NAME.equalsIgnoreCase(type)) {
-            // postgre
-            return DataSourceUtil.POSTGRESQL_DRIVER_CLASS;
-        } else {
-            // mysql
-            return DataSourceUtil.MYSQL_DRIVER_CLASS;
-        }
-    }
-
-    /**
-     * 拼接数据源连接 url
-     *
-     * @param dto 数据源dto
-     * @return 返回url
-     */
-    private String getUrl(DataSourceDTO dto) {
-
-        if (!DataSourceUtil.dataSourceMap.containsKey(dto.getType())) {
-            throw new FindException("错误，未知的数据源类型：" + dto.getType());
-        }
-
-        if (DataSourceUtil.POSTGRESQL_NAME.equalsIgnoreCase(dto.getType())) {
-            // postgre
-            return DataSourceUtil.POSTGRESQL_CONNECTION_PREFIX
-                    + dto.getIp() + ":"
-                    + dto.getPort() + "/"
-                    + dto.getDatabase()
-                    + DataSourceUtil.POSTGRESQL_CONNECTION_SUFFIX;
-        } else {
-            // mysql
-            return DataSourceUtil.MYSQL_CONNECTION_PREFIX
-                    + dto.getIp() + ":"
-                    + dto.getPort() + "/"
-                    + dto.getDatabase()
-                    + DataSourceUtil.MYSQL_CONNECTION_SUFFIX;
-        }
+    @Override
+    public boolean alterTable(DataSourceDTO dataSourceDTO, String sql) {
+        // 数据源的切换与释放交给AOP去处理
+        return alterTable(sql);
     }
 }

@@ -20,12 +20,12 @@ import java.io.Serializable;
 @Accessors(chain = true)
 public class TableVO extends BaseVO implements Serializable {
 
-    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "test")
+    @ApiModelProperty(value = "表所处的schema，不指定可能会有重复的表",name = "tableSchema",example = "public")
     private String tableSchema;
 
-    @ApiModelProperty(value = "表名称，用于模糊查询",name = "tableName",example = "tab_test")
+    @ApiModelProperty(value = "表名称，用于模糊查询",name = "tableName",example = "test")
     private String tableName;
 
-    @ApiModelProperty(value = "数据源类型，系统自动判断",name = "type", hidden = true, example = "mysql")
+    @ApiModelProperty(value = "数据源类型，系统自动判断",name = "type", hidden = true, example = "postgresql")
     private String type;
 }

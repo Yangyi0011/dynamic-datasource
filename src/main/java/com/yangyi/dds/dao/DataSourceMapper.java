@@ -73,6 +73,12 @@ public interface DataSourceMapper {
     int delete(@Param("dto") DeleteDTO dto);
 
     /**
+     * 动态数据全表删除
+     * @param dto 数据更新 dto
+     */
+    int deleteAll(@Param("dto") DeleteDTO dto);
+
+    /**
      * 查询表字段
      * @param vo 字段查询 vo
      * @return List<Map<String,Object>>
@@ -92,4 +98,10 @@ public interface DataSourceMapper {
      * @return String
      */
     Map<String,Object> getPrimaryKeyForPostgreSQL(@Param("vo") PrimaryKeyVO vo);
+
+    /**
+     * 修改表
+     * @param sql 语句
+     */
+    int alterTable(@Param("sql") String sql);
 }

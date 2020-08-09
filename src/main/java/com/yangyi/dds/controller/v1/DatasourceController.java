@@ -177,4 +177,16 @@ public class DatasourceController {
     public R batchDelete(@Validated(value = {ValidationGroup_Add.class}) @RequestBody DynamicDeleteDTO dto) {
         return R.success(dataSourceService.batchDelete(dto.getDataSourceDTO(),dto.getBatchDeleteDTO()));
     }
+
+    @ApiOperation("动态数据删除【删除全表】（指定数据源）")
+    @RequestMapping(value = "/deleteAllByDataSource", method = RequestMethod.DELETE)
+    public R deleteAll(@Validated(value = {ValidationGroup_Add.class}) @RequestBody DynamicDeleteAllDTO dto) {
+        return R.success(dataSourceService.deleteAll(dto.getDataSourceDTO(),dto.getDeleteDTO()));
+    }
+
+    /*@ApiOperation("修改表")
+    @RequestMapping(value = "/alterTable", method = RequestMethod.POST)
+    public R alterTable(@Validated(value = {ValidationGroup_Add.class}) @RequestBody DynamicAlertTableDTO dto) {
+        return R.success(dataSourceService.alterTable(dto.getDataSourceDTO(),dto.getSql()));
+    }*/
 }
